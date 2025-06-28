@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Frontend for Medical Intake Summarizer - AI-powered symptom analysis",
   "private": true,
-  "homepage": ".",
   "dependencies": {
     "@tailwindcss/forms": "^0.5.7",
     "axios": "^1.6.2",
@@ -14,9 +13,12 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "PUBLIC_URL=./ react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
+  },
+  "engines": {
+    "npm": ">=10.0.0 <11.0.0"
   },
   "eslintConfig": {
     "extends": [
