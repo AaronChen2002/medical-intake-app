@@ -1,6 +1,6 @@
-# Medical Intake Summarizer
+# Medical SOAP Note Summarizer
 
-An AI-powered web application that analyzes user symptoms and generates structured medical summaries using GPT technology.
+An AI-powered web application that helps healthcare providers analyze and summarize their SOAP notes from patient encounters using GPT technology.
 
 ## 🏗️ Project Structure
 
@@ -10,7 +10,9 @@ medical-intake-app/
 │   ├── src/
 │   │   ├── App.jsx          # Main React application component
 │   │   ├── index.js         # React entry point
-│   │   └── index.css        # Tailwind CSS + custom medical theme styles
+│   │   ├── index.css        # Tailwind CSS + custom medical theme styles
+│   │   └── components/
+│   │       └── SOAPForm.jsx # SOAP note input form component
 │   ├── public/
 │   │   └── index.html       # HTML template
 │   ├── package.json         # Frontend dependencies
@@ -127,46 +129,68 @@ The project uses a dedicated conda environment called `note_summarizer` to isola
 - **Deactivate**: `conda deactivate`
 - **Remove**: `conda env remove -n note_summarizer`
 
-## 📋 Features (Planned)
+## 📋 Features
 
-- [ ] Symptom input form with natural language processing
-- [ ] AI-powered medical analysis using GPT
-- [ ] Structured medical summary generation
-- [ ] Potential condition identification
-- [ ] Severity assessment
-- [ ] Medical recommendations
-- [ ] Responsive design with medical theme
-- [ ] User authentication and history
+### Current Features
+- ✅ SOAP note input form with all four sections (Subjective, Objective, Assessment, Plan)
+- ✅ AI-powered analysis of SOAP notes using GPT-4
+- ✅ Structured output with key findings, critical points, and follow-up priorities
+- ✅ Clinical impressions and evidence-based recommendations
+- ✅ Provider-focused interface and terminology
+- ✅ Responsive design optimized for clinical workflow
+- ✅ Accessibility features for healthcare environments
+
+### Planned Features
+- [ ] SOAP note templates and common phrases
+- [ ] Integration with EHR systems
+- [ ] Batch processing of multiple encounters
+- [ ] Clinical decision support alerts
 - [ ] Export functionality for medical records
+- [ ] User authentication and encounter history
+- [ ] Specialty-specific SOAP analysis (cardiology, pediatrics, etc.)
 
 ## 🛠️ Development
 
 ### Backend API Endpoints
 
 - `GET /`: Health check
-- `POST /analyze-symptoms`: Analyze symptoms and generate medical summary
+- `POST /analyze-soap`: Analyze SOAP notes and generate clinical summary
 
 ### Frontend Components
 
 - Main application layout
-- Symptom input form
-- Medical summary display
+- SOAP note input form with four sections
+- Clinical analysis results display
 - Loading states and error handling
 
-## 📝 TODO
+## 📝 Development Progress
 
-- [ ] Implement GPT API integration
-- [ ] Add proper error handling
-- [ ] Implement rate limiting
-- [ ] Add user authentication
-- [ ] Create comprehensive test suite
-- [ ] Add logging and monitoring
-- [ ] Implement security measures
-- [ ] Add database for user data persistence
+### Completed Steps
+- [x] **Step 1**: Project scaffolding and setup
+- [x] **Step 2**: Frontend React app with Tailwind CSS
+- [x] **Step 3**: FastAPI backend with OpenAI integration
+- [x] **Step 4**: Basic frontend-backend connection
+- [x] **Step 5**: SOAP note input form with validation
+- [x] **Step 6**: OpenAI integration for SOAP analysis
+
+### Next Steps
+- [ ] **Step 7**: Enhanced results display with clinical insights
+- [ ] **Step 8**: Advanced features (templates, EHR integration)
+- [ ] **Step 9**: Testing and quality assurance
+- [ ] **Step 10**: Deployment preparation
+
+## 🏥 SOAP Note Format
+
+The application follows the standard SOAP note format:
+
+- **Subjective**: Patient-reported symptoms, history, and subjective information
+- **Objective**: Measurable, observable findings from examination and tests
+- **Assessment**: Clinical interpretation and diagnostic reasoning
+- **Plan**: Treatment plan, interventions, and follow-up recommendations
 
 ## ⚠️ Disclaimer
 
-This application is for educational and informational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare providers for medical concerns.
+This application is designed for clinical decision support and should be used in conjunction with professional medical judgment. It is not a substitute for clinical expertise or professional medical practice. Always verify AI-generated insights against clinical guidelines and best practices.
 
 ## 📄 License
 

@@ -1,24 +1,30 @@
-# Medical Intake Summarizer - Backend FastAPI Application
+# Medical SOAP Note Summarizer - Backend FastAPI Application
 # This file will contain the main FastAPI application and API endpoints
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import List, Optional
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+import json
+import logging
 
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Configure OpenAI
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Medical Intake Summarizer API",
-    description="AI-powered medical symptom analysis and summary generation",
+    title="Medical SOAP Note Summarizer API",
+    description="AI-powered SOAP note summarization for healthcare providers",
     version="1.0.0"
 )
 
@@ -32,50 +38,139 @@ app.add_middleware(
 )
 
 # Pydantic models for request/response validation
-class SymptomRequest(BaseModel):
-    """Model for incoming symptom data from frontend"""
-    symptoms: str
+class EncounterNotesRequest(BaseModel):
+    """Model for incoming encounter notes from provider"""
+    encounter_notes: str
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
-    additional_notes: Optional[str] = None
+    additional_context: Optional[str] = None
 
-class MedicalSummaryResponse(BaseModel):
-    """Model for AI-generated medical summary response"""
-    summary: str
-    potential_conditions: list[str]
-    severity_level: str
-    recommendations: list[str]
-    disclaimer: str
+class SOAPAnalysisResponse(BaseModel):
+    """Model for AI-generated SOAP analysis response"""
+    subjective: str = ""
+    objective: str = ""
+    assessment: str = ""
+    plan: str = ""
+    key_findings: str = ""
+    critical_points: List[str] = Field(default_factory=list)
+    clinical_impressions: str = ""
+    cdi_codes: List[str] = Field(default_factory=list)
+    next_steps: List[str] = Field(default_factory=list)
+    follow_up_priorities: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    disclaimer: str = "This analysis is for clinical decision support only and should not replace professional medical judgment."
 
-# API Routes
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {"message": "Medical Intake Summarizer API is running"}
+    return {"message": "Medical SOAP Note Summarizer API is running"}
 
-@app.post("/analyze-symptoms", response_model=MedicalSummaryResponse)
-async def analyze_symptoms(request: SymptomRequest):
+@app.post("/analyze-soap", response_model=SOAPAnalysisResponse)
+async def analyze_soap_notes(request: EncounterNotesRequest):
     """
-    Main endpoint for analyzing symptoms and generating medical summary
-    TODO: Integrate with GPT API for symptom analysis
-    TODO: Add proper error handling and validation
-    TODO: Implement rate limiting and security measures
+    Analyze natural encounter notes and structure them into SOAP format
+    with clinical insights, CDI codes, and next steps recommendations.
     """
     try:
-        # TODO: Call GPT API with symptoms
-        # TODO: Parse and structure the response
-        # TODO: Return formatted medical summary
+        # Build context for the AI
+        context_parts = [f"Encounter Notes: {request.encounter_notes}"]
         
-        # Placeholder response
-        return MedicalSummaryResponse(
-            summary="AI-generated medical summary will appear here",
-            potential_conditions=["Condition 1", "Condition 2"],
-            severity_level="moderate",
-            recommendations=["Recommendation 1", "Recommendation 2"],
-            disclaimer="This is not a substitute for professional medical advice"
+        if request.patient_age:
+            context_parts.append(f"Patient Age: {request.patient_age}")
+        if request.patient_gender:
+            context_parts.append(f"Patient Gender: {request.patient_gender}")
+        if request.additional_context:
+            context_parts.append(f"Additional Context: {request.additional_context}")
+        
+        context = "\n".join(context_parts)
+        
+        # Create the prompt for comprehensive SOAP analysis
+        prompt = f"""
+You are an expert medical AI assistant. Analyze the following encounter notes and provide a comprehensive SOAP note structure along with clinical insights, ICD-10 codes, and next steps.
+
+{context}
+
+Please provide your response in the following JSON format:
+{{
+    "subjective": "Patient's reported symptoms, history, and concerns",
+    "objective": "Observable findings, vital signs, physical exam, lab results",
+    "assessment": "Differential diagnoses and clinical reasoning",
+    "plan": "Treatment plan, medications, follow-up, referrals",
+    "key_findings": "Summary of most important clinical findings",
+    "critical_points": [
+        "Critical point 1",
+        "Critical point 2",
+        "Critical point 3"
+    ],
+    "clinical_impressions": "Overall clinical assessment and impressions",
+    "cdi_codes": [
+        "ICD-10 code 1 - Description",
+        "ICD-10 code 2 - Description",
+        "ICD-10 code 3 - Description"
+    ],
+    "next_steps": [
+        "Immediate next step 1",
+        "Immediate next step 2",
+        "Immediate next step 3"
+    ],
+    "follow_up_priorities": [
+        "Follow-up priority 1",
+        "Follow-up priority 2",
+        "Follow-up priority 3"
+    ],
+    "recommendations": [
+        "General recommendation 1",
+        "General recommendation 2",
+        "General recommendation 3"
+    ],
+    "disclaimer": "This analysis is for clinical decision support only and should not replace professional medical judgment. Always verify all information and consult with appropriate specialists as needed."
+}}
+
+Guidelines:
+1. Be thorough but concise in each section
+2. Include relevant ICD-10 codes for conditions mentioned
+3. Provide actionable next steps for the clinician
+4. Highlight any critical findings that require immediate attention
+5. Consider patient demographics in your assessment
+6. Focus on evidence-based recommendations
+7. Ensure all medical information is accurate and appropriate
+8. IMPORTANT: If no information is available for a field, return an empty string ("") for text fields or an empty list ([]) for list fields. Do not omit any keys from the final JSON structure.
+
+Respond only with the JSON object, no additional text.
+"""
+
+        # Call OpenAI API
+        logger.info("Calling OpenAI API for SOAP analysis...")
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an expert medical AI assistant specializing in SOAP note analysis and clinical documentation improvement."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
         )
+        
+        # Extract the response content
+        ai_response = response.choices[0].message.content.strip()
+        
+        # Parse the JSON response
+        try:
+            result = json.loads(ai_response)
+            
+            logger.info("Successfully parsed OpenAI SOAP analysis response")
+            return SOAPAnalysisResponse(**result)
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse OpenAI response as JSON: {e}")
+            logger.error(f"Raw response: {ai_response}")
+            raise HTTPException(status_code=500, detail=f"Failed to parse AI response: {str(e)}")
+        except ValueError as e:
+            raise HTTPException(status_code=500, detail=f"Invalid response format: {str(e)}")
+            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
