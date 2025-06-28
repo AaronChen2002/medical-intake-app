@@ -2,7 +2,7 @@
 
 An AI-powered web application that analyzes user symptoms and generates structured medical summaries using GPT technology.
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 medical-intake-app/
@@ -23,7 +23,7 @@ medical-intake-app/
 └── README.md               # Project documentation
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Automated Setup (Recommended)
 
@@ -108,7 +108,7 @@ The backend will be available at `http://localhost:8000`
 
 The frontend will be available at `http://localhost:3000`
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -139,7 +139,7 @@ The project uses a dedicated conda environment called `note_summarizer` to isola
 - [ ] User authentication and history
 - [ ] Export functionality for medical records
 
-## 🛠️ Development
+## Development
 
 ### Backend API Endpoints
 
@@ -153,7 +153,7 @@ The project uses a dedicated conda environment called `note_summarizer` to isola
 - Medical summary display
 - Loading states and error handling
 
-## 📝 TODO
+## TODO
 
 - [ ] Implement GPT API integration
 - [ ] Add proper error handling
@@ -164,10 +164,3 @@ The project uses a dedicated conda environment called `note_summarizer` to isola
 - [ ] Implement security measures
 - [ ] Add database for user data persistence
 
-## ⚠️ Disclaimer
-
-This application is for educational and informational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare providers for medical concerns.
-
-## 📄 License
-
-This project is licensed under the MIT License.
