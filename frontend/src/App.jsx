@@ -11,13 +11,14 @@ function App() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [error, setError] = useState(null);
 
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
   const handleFormSubmit = async (formData) => {
     setIsLoading(true);
     setError(null);
     setAnalysisResult(null);
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
       const response = await axios.post(`${apiUrl}/analyze-soap`, {
         encounter_notes: formData.encounterNotes,
         patient_age: formData.patientAge ? parseInt(formData.patientAge) : null,
@@ -94,6 +95,7 @@ function App() {
                 onSubmit={handleFormSubmit} 
                 isLoading={isLoading} 
                 error={error}
+                apiUrl={apiUrl}
               />
               {error && (
                 <div className="medical-card bg-red-50 border-red-200 mt-6 animate-fade-in">
@@ -124,4 +126,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

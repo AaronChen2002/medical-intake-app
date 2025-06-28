@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 
 const exampleNote = `Patient: John Doe, 45-year-old male
 Subjective: Patient presents with a 3-day history of a persistent, dry cough and progressive shortness of breath. He reports feeling feverish and fatigued. Notes occasional headaches and muscle aches. No significant past medical history. Non-smoker.
@@ -16,7 +17,13 @@ Plan:
 4. Swab for COVID-19 and influenza.
 5. Advise patient to monitor symptoms and follow up in 2 days.`;
 
-const EncounterNotesForm = ({ onSubmit, isLoading, analysisResult, error }) => {
+const MicrophoneIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 14a2 2 0 0 1-2-2V6a2 2 0 0 1 4 0v6a2 2 0 0 1-2 2zm-1-9a1 1 0 0 0-1 1v6a3 3 0 0 0 6 0V6a1 1 0 0 0-1-1h-4zm7 6a1 1 0 0 1-1 1 5 5 0 0 1-10 0 1 1 0 1 1 2 0 3 3 0 0 0 6 0 1 1 0 0 1 1-1zM5 21a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1zm14 0a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1z"/>
+  </svg>
+);
+
+const EncounterNotesForm = ({ onSubmit, isLoading, analysisResult, error, apiUrl }) => {
   const [formData, setFormData] = useState({
     encounterNotes: '',
     patientAge: '',
@@ -25,7 +32,11 @@ const EncounterNotesForm = ({ onSubmit, isLoading, analysisResult, error }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const encounterNotesRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   // Autofocus the main textarea on component mount
   useEffect(() => {
@@ -85,7 +96,74 @@ const EncounterNotesForm = ({ onSubmit, isLoading, analysisResult, error }) => {
     }));
   };
 
-  const isSubmitDisabled = isLoading || !formData.encounterNotes.trim();
+  const handleRecordButtonClick = async () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      await startRecording();
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setIsRecording(true);
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        handleTranscription(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.start();
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      // You could set an error state here to show a message to the user
+      alert("Could not access microphone. Please ensure you have given permission in your browser settings.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleTranscription = async (audioBlob) => {
+    setIsTranscribing(true);
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'encounter-audio.webm');
+
+    try {
+      // By not setting the 'Content-Type' header, we allow the browser to
+      // automatically set it to 'multipart/form-data' with the correct
+      // boundary, which is crucial for file uploads.
+      const response = await axios.post(`${apiUrl}/transcribe-audio`, formData);
+      const transcribedText = response.data.transcription;
+      if (transcribedText) {
+        setFormData(prev => ({
+          ...prev,
+          encounterNotes: prev.encounterNotes 
+            ? `${prev.encounterNotes}\n${transcribedText}` 
+            : transcribedText
+        }));
+      }
+    } catch (err) {
+      console.error("Error transcribing audio:", err);
+      alert("There was an error transcribing the audio. Please check the console for details.");
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const isSubmitDisabled = isLoading || !formData.encounterNotes.trim() || isRecording || isTranscribing;
 
   return (
     <div className="medical-card" role="main" aria-labelledby="form-title">
@@ -208,8 +286,8 @@ const EncounterNotesForm = ({ onSubmit, isLoading, analysisResult, error }) => {
                 </select>
               </div>
             </div>
-
-            {/* Additional Context */}
+            
+            {/* Additional Context Textarea */}
             <div>
               <label 
                 htmlFor="additionalContext" 
@@ -222,51 +300,61 @@ const EncounterNotesForm = ({ onSubmit, isLoading, analysisResult, error }) => {
                 name="additionalContext"
                 value={formData.additionalContext}
                 onChange={handleInputChange}
-                rows={3}
+                rows={2}
                 className="medical-input transition-colors focus:border-blue-500 focus:ring-blue-500"
-                placeholder="e.g., patient has a family history of heart disease, telehealth visit, etc."
+                placeholder="e.g., family history, recent travel, specific concerns..."
                 disabled={isLoading}
               />
             </div>
           </div>
         </details>
 
-        {/* Submit Button */}
-        <div className="pt-4">
-          <button
-            type="submit"
-            disabled={isSubmitDisabled}
-            className="w-full text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center
-                       bg-blue-600 hover:bg-blue-700
-                       disabled:bg-gray-400 disabled:cursor-not-allowed"
-            aria-describedby={isLoading ? "loading-status" : undefined}
-          >
-            {isLoading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        {/* Form Actions */}
+        <div className="pt-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button
+              type="button"
+              onClick={handleRecordButtonClick}
+              className={`p-2 rounded-full transition-colors duration-200 ease-in-out ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              disabled={isLoading || isTranscribing}
+              aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+            >
+              <MicrophoneIcon className="w-6 h-6" />
+            </button>
+            {isTranscribing && (
+              <div className="flex items-center text-sm text-gray-600 animate-fade-in">
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>Analyzing Notes...</span>
-              </>
-            ) : (
-              'Analyze & Structure Notes'
+                <span>Transcribing...</span>
+              </div>
             )}
+          </div>
+          <button
+            type="submit"
+            className="medical-button"
+            disabled={isSubmitDisabled}
+          >
+            {isLoading ? (
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : null}
+            <span>{isLoading ? 'Analyzing...' : 'Analyze Notes'}</span>
           </button>
-          {isLoading && (
-            <p id="loading-status" className="mt-2 text-sm text-center text-gray-600" role="status">
-              AI analysis in progress. This may take a moment.
-            </p>
-          )}
-          {!isLoading && !analysisResult && !error && (
-            <p className="mt-2 text-sm text-center text-gray-500">
-              Click the button above to begin the AI analysis.
-            </p>
-          )}
         </div>
+
+        {/* Global Error Display */}
+        {error && (
+          <div className="mt-4 p-4 border border-red-300 bg-red-50 rounded-lg text-red-800 text-sm" role="alert">
+            <p>An error occurred while processing your request. Please try again.</p>
+          </div>
+        )}
       </form>
     </div>
   );
 };
 
-export default EncounterNotesForm; 
+export default EncounterNotesForm;

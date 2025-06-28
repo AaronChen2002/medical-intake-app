@@ -1,7 +1,7 @@
 # Medical SOAP Note Summarizer - Backend FastAPI Application
 # This file will contain the main FastAPI application and API endpoints
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import json
 import logging
+import openai
 
 # Load environment variables
 load_dotenv()
@@ -171,6 +172,29 @@ Respond only with the JSON object, no additional text.
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+@app.post("/transcribe-audio")
+async def transcribe_audio(file: UploadFile = File(...)):
+    if not file:
+        raise HTTPException(status_code=400, detail="No audio file sent.")
+
+    try:
+        # The whisper API requires a file-like object with a name.
+        # We pass the UploadFile directly, but we need to ensure it has a name.
+        # FastAPI's UploadFile has a 'filename' attribute.
+        audio_data = file.file
+        
+        # Call the OpenAI Audio API for transcription
+        transcription_response = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=(file.filename, audio_data, file.content_type)
+        )
+        
+        transcription_text = transcription_response.text
+        return {"transcription": transcription_text}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
