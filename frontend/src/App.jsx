@@ -17,7 +17,8 @@ function App() {
     setAnalysisResult(null);
 
     try {
-      const response = await axios.post('http://localhost:8000/analyze-soap', {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${apiUrl}/analyze-soap`, {
         encounter_notes: formData.encounterNotes,
         patient_age: formData.patientAge ? parseInt(formData.patientAge) : null,
         patient_gender: formData.patientGender || null,

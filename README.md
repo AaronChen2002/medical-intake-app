@@ -108,6 +108,40 @@ The backend will be available at `http://localhost:8000`
 
 The frontend will be available at `http://localhost:3000`
 
+## 🚀 Deployment
+
+This project is optimized for deployment on Render (backend) and Vercel (frontend).
+
+### Backend (Render)
+
+1.  **Sign up** for a [Render](https://render.com/) account.
+2.  From the dashboard, click **New +** and select **Web Service**.
+3.  Connect your GitHub repository (`medical-intake-app`).
+4.  Configure the service with the following settings:
+    *   **Name**: `acorn-backend` (or your preferred name)
+    *   **Root Directory**: `backend`
+    *   **Environment**: `Python 3`
+    *   **Region**: Choose a region close to you.
+    *   **Build Command**: `pip install -r requirements.txt`
+    *   **Start Command**: `gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app`
+5.  Click **Advanced** and add the following environment variable:
+    *   **Key**: `OPENAI_API_KEY`, **Value**: `your_openai_api_key_here`
+6.  Click **Create Web Service**. Render will build and deploy your backend.
+7.  Once deployed, copy the URL provided by Render (e.g., `https://acorn-backend.onrender.com`).
+
+### Frontend (Vercel)
+
+1.  **Sign up** for a [Vercel](https://vercel.com/) account.
+2.  From the dashboard, click **Add New...** and select **Project**.
+3.  Import your GitHub repository (`medical-intake-app`).
+4.  Configure the project with the following settings:
+    *   **Framework Preset**: `Create React App`
+    *   **Root Directory**: `frontend`
+5.  Expand the **Environment Variables** section and add the following:
+    *   **Name**: `REACT_APP_API_URL`, **Value**: Paste the backend URL you copied from Render.
+6.  Click **Deploy**. Vercel will build and deploy your frontend.
+7.  Once deployed, you can visit the Vercel URL to see your live application!
+
 ## Configuration
 
 ### Environment Variables
