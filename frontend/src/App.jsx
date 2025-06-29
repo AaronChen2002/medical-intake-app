@@ -13,42 +13,17 @@ function App() {
 
   const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-  const handleFormSubmit = async (formData) => {
-    setIsLoading(true);
+  const handleAnalysisComplete = (analysisData) => {
+    setIsLoading(true); // Keep loading state while results are displayed
     setError(null);
-    setAnalysisResult(null);
-
-    try {
-      const response = await axios.post(`${apiUrl}/analyze-soap`, {
-        encounter_notes: formData.encounterNotes,
-        patient_age: formData.patientAge ? parseInt(formData.patientAge) : null,
-        patient_gender: formData.patientGender || null,
-        additional_context: formData.additionalContext || null
-      });
-      setAnalysisResult(response.data);
-    } catch (err) {
-      console.error('API call error:', err);
-      if (err.response) {
-        let errorMessage = 'An unknown server error occurred';
-        const errorDetail = err.response.data?.detail;
-        if (errorDetail) {
-          if (Array.isArray(errorDetail)) {
-            errorMessage = errorDetail.map(e => `Invalid input for '${e.loc[1]}': ${e.msg}`).join('; ');
-          } else if (typeof errorDetail === 'string') {
-            errorMessage = errorDetail;
-          } else if (err.response.data?.message) {
-            errorMessage = err.response.data.message;
-          }
-        }
-        setError(`Error: ${errorMessage}`);
-      } else if (err.request) {
-        setError('Network error: Unable to connect to the server. Please check your connection and try again.');
-      } else {
-        setError('An unexpected error occurred. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
+    
+    if (analysisData) {
+      setAnalysisResult(analysisData);
+    } else {
+      setError('Received an empty analysis. Please try again.');
     }
+    
+    setIsLoading(false);
   };
 
   const handleReset = () => {
@@ -92,9 +67,8 @@ function App() {
             </div>
             <div className="max-w-4xl mx-auto">
               <EncounterNotesForm 
-                onSubmit={handleFormSubmit} 
+                onSubmit={handleAnalysisComplete} 
                 isLoading={isLoading} 
-                error={error}
                 apiUrl={apiUrl}
               />
               {error && (
@@ -111,7 +85,10 @@ function App() {
           </>
         ) : (
           <div className="max-w-6xl mx-auto">
-            <AnalysisResults analysisResult={analysisResult} onReset={handleReset} />
+            <AnalysisResults 
+              analysisResult={analysisResult} 
+              onReset={handleReset} 
+            />
           </div>
         )}
       </main>

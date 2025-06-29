@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from enum import Enum
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -32,7 +33,7 @@ app = FastAPI(
 # Configure CORS for frontend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_origins=["http://localhost:3000", "https://*.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,155 +47,137 @@ class EncounterNotesRequest(BaseModel):
     patient_gender: Optional[str] = None
     additional_context: Optional[str] = None
 
+class Specialty(str, Enum):
+    DEFAULT = "Default"
+    CARDIOLOGY = "Cardiology"
+    PSYCHIATRY = "Psychiatry"
+    DERMATOLOGY = "Dermatology"
+
+TEMPLATES = {
+    Specialty.DEFAULT: {
+        "subjective": "Patient's reported symptoms, history, and concerns.",
+        "objective": "Observable findings, vital signs, physical exam, lab results.",
+        "assessment": "Differential diagnoses and clinical reasoning.",
+        "plan": "Treatment plan, medications, follow-up, referrals.",
+    },
+    Specialty.CARDIOLOGY: {
+        "subjective": "Chief Complaint, HPI, Past Cardiac History, Cardiac Risk Factors (Hypertension, Diabetes, etc.), Review of Systems.",
+        "objective": "Vitals, Physical Exam (Cardiovascular focus: JVP, heart sounds, edema), EKG Findings, Lab Results (Troponin, etc.).",
+        "assessment": "Primary cardiac diagnosis (e.g., Acute Coronary Syndrome, Atrial Fibrillation).",
+        "plan": "Medications (e.g., DAPT, GDMT), Planned Procedures (e.g., Cardiac Catheterization), Follow-up plan.",
+    },
+    Specialty.PSYCHIATRY: {
+        "subjective": "Chief Complaint, HPI, Past Psychiatric History, Psychiatric ROS, Substance Use History.",
+        "objective": "Mental Status Exam (MSE: Appearance, Behavior, Speech, Mood, Affect, Thought Process), Physical Exam Findings, Diagnostic scales (e.g., PHQ-9).",
+        "assessment": "DSM-5 Diagnosis, Differential Diagnosis, Risk Assessment (Suicide/Homicide risk).",
+        "plan": "Medication Plan, Therapy Recommendations (e.g., CBT, DBT), Safety Plan, Follow-up.",
+    },
+    Specialty.DERMATOLOGY: {
+        "subjective": "Chief Complaint (e.g., 'new rash'), HPI (location, duration, symptoms like itching/pain), Past Dermatologic History.",
+        "objective": "Physical Exam (detailed description of lesions: type, morphology, distribution), Diagnostic Tests (e.g., Biopsy results, KOH prep).",
+        "assessment": "Primary Diagnosis (e.g., Atopic Dermatitis, Psoriasis), Differential Diagnosis.",
+        "plan": "Topical medications, Oral medications, Procedures (e.g., Cryotherapy), Patient Education, Follow-up.",
+    }
+}
+
+class TextAnalysisRequest(BaseModel):
+    notes: str
+    specialty: Specialty = Specialty.DEFAULT
+
 class SOAPAnalysisResponse(BaseModel):
     """Model for AI-generated SOAP analysis response"""
-    subjective: str = ""
-    objective: str = ""
-    assessment: str = ""
-    plan: str = ""
-    key_findings: str = ""
-    critical_points: List[str] = Field(default_factory=list)
-    clinical_impressions: str = ""
-    cdi_codes: List[str] = Field(default_factory=list)
-    next_steps: List[str] = Field(default_factory=list)
-    follow_up_priorities: List[str] = Field(default_factory=list)
-    recommendations: List[str] = Field(default_factory=list)
+    analysis: dict
     disclaimer: str = "This analysis is for clinical decision support only and should not replace professional medical judgment."
 
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {"message": "Medical SOAP Note Summarizer API is running"}
+    return {"message": "Acorn AI API is running"}
 
-@app.post("/analyze-soap", response_model=SOAPAnalysisResponse)
-async def analyze_soap_notes(request: EncounterNotesRequest):
+@app.post("/transcribe/", response_model=SOAPAnalysisResponse)
+async def transcribe_and_analyze(
+    file: UploadFile = File(...),
+    specialty: Specialty = Specialty.DEFAULT
+):
     """
-    Analyze natural encounter notes and structure them into SOAP format
-    with clinical insights, CDI codes, and next steps recommendations.
+    Transcribes audio and generates a structured SOAP note based on the
+    selected medical specialty.
     """
-    try:
-        # Build context for the AI
-        context_parts = [f"Encounter Notes: {request.encounter_notes}"]
-        
-        if request.patient_age:
-            context_parts.append(f"Patient Age: {request.patient_age}")
-        if request.patient_gender:
-            context_parts.append(f"Patient Gender: {request.patient_gender}")
-        if request.additional_context:
-            context_parts.append(f"Additional Context: {request.additional_context}")
-        
-        context = "\n".join(context_parts)
-        
-        # Create the prompt for comprehensive SOAP analysis
-        prompt = f"""
-You are an expert medical AI assistant. Analyze the following encounter notes and provide a comprehensive SOAP note structure along with clinical insights, ICD-10 codes, and next steps.
-
-{context}
-
-Please provide your response in the following JSON format:
-{{
-    "subjective": "Patient's reported symptoms, history, and concerns",
-    "objective": "Observable findings, vital signs, physical exam, lab results",
-    "assessment": "Differential diagnoses and clinical reasoning",
-    "plan": "Treatment plan, medications, follow-up, referrals",
-    "key_findings": "Summary of most important clinical findings",
-    "critical_points": [
-        "Critical point 1",
-        "Critical point 2",
-        "Critical point 3"
-    ],
-    "clinical_impressions": "Overall clinical assessment and impressions",
-    "cdi_codes": [
-        "ICD-10 code 1 - Description",
-        "ICD-10 code 2 - Description",
-        "ICD-10 code 3 - Description"
-    ],
-    "next_steps": [
-        "Immediate next step 1",
-        "Immediate next step 2",
-        "Immediate next step 3"
-    ],
-    "follow_up_priorities": [
-        "Follow-up priority 1",
-        "Follow-up priority 2",
-        "Follow-up priority 3"
-    ],
-    "recommendations": [
-        "General recommendation 1",
-        "General recommendation 2",
-        "General recommendation 3"
-    ],
-    "disclaimer": "This analysis is for clinical decision support only and should not replace professional medical judgment. Always verify all information and consult with appropriate specialists as needed."
-}}
-
-Guidelines:
-1. Be thorough but concise in each section
-2. Include relevant ICD-10 codes for conditions mentioned
-3. Provide actionable next steps for the clinician
-4. Highlight any critical findings that require immediate attention
-5. Consider patient demographics in your assessment
-6. Focus on evidence-based recommendations
-7. Ensure all medical information is accurate and appropriate
-8. IMPORTANT: If no information is available for a field, return an empty string ("") for text fields or an empty list ([]) for list fields. Do not omit any keys from the final JSON structure.
-
-Respond only with the JSON object, no additional text.
-"""
-
-        # Call OpenAI API
-        logger.info("Calling OpenAI API for SOAP analysis...")
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are an expert medical AI assistant specializing in SOAP note analysis and clinical documentation improvement."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,
-            max_tokens=2000
-        )
-        
-        # Extract the response content
-        ai_response = response.choices[0].message.content.strip()
-        
-        # Parse the JSON response
-        try:
-            result = json.loads(ai_response)
-            
-            logger.info("Successfully parsed OpenAI SOAP analysis response")
-            return SOAPAnalysisResponse(**result)
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse OpenAI response as JSON: {e}")
-            logger.error(f"Raw response: {ai_response}")
-            raise HTTPException(status_code=500, detail=f"Failed to parse AI response: {str(e)}")
-        except ValueError as e:
-            raise HTTPException(status_code=500, detail=f"Invalid response format: {str(e)}")
-            
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
-@app.post("/transcribe-audio")
-async def transcribe_audio(file: UploadFile = File(...)):
     if not file:
         raise HTTPException(status_code=400, detail="No audio file sent.")
 
     try:
-        # The whisper API requires a file-like object with a name.
-        # We pass the UploadFile directly, but we need to ensure it has a name.
-        # FastAPI's UploadFile has a 'filename' attribute.
+        # Transcribe audio
         audio_data = file.file
-        
-        # Call the OpenAI Audio API for transcription
         transcription_response = client.audio.transcriptions.create(
             model="whisper-1",
             file=(file.filename, audio_data, file.content_type)
         )
-        
         transcription_text = transcription_response.text
-        return {"transcription": transcription_text}
+        logger.info("Successfully transcribed audio.")
+
+        # Generate SOAP note
+        analysis_json = await generate_note_from_text(transcription_text, specialty)
+        return SOAPAnalysisResponse(analysis=analysis_json)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
+        logger.error(f"An unexpected error occurred during transcription: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+@app.post("/analyze-text/", response_model=SOAPAnalysisResponse)
+async def analyze_text(request: TextAnalysisRequest):
+    """
+    Generates a structured SOAP note from text based on the selected medical specialty.
+    """
+    try:
+        logger.info(f"Generating note from text for specialty: {request.specialty.value}")
+        analysis_json = await generate_note_from_text(request.notes, request.specialty)
+        return SOAPAnalysisResponse(analysis=analysis_json)
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during text analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+async def generate_note_from_text(text: str, specialty: Specialty):
+    """Helper function to generate a note from text using OpenAI."""
+    template = TEMPLATES.get(specialty, TEMPLATES[Specialty.DEFAULT])
+    prompt = f"""
+You are an expert medical AI assistant. Based on the following clinical text,
+please generate a structured clinical note in JSON format for the specialty: {specialty.value}.
+
+Clinical Text:
+"{text}"
+
+Use the following JSON structure as a template:
+{json.dumps(template, indent=4)}
+
+Guidelines:
+1.  Populate the JSON with information extracted from the text.
+2.  If information for a field is not available, use an empty string "" or an empty list [].
+3.  Respond ONLY with the populated JSON object.
+"""
+
+    logger.info(f"Generating SOAP note for specialty: {specialty.value}")
+    analysis_response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a highly skilled medical scribe AI."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3,
+        max_tokens=2000,
+        response_format={"type": "json_object"}
+    )
+
+    ai_response_content = analysis_response.choices[0].message.content.strip()
+    
+    try:
+        analysis_json = json.loads(ai_response_content)
+        logger.info("Successfully parsed OpenAI analysis response.")
+        return analysis_json
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI response as JSON: {e}")
+        logger.error(f"Raw AI response: {ai_response_content}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response.")
 
 if __name__ == "__main__":
     import uvicorn
