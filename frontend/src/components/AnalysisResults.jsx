@@ -17,9 +17,11 @@ const ClipboardIcon = ({ copied }) => (
   )
 );
 
-const Section = ({ title, content, isList = false }) => {
+const Section = ({ title, content }) => {
   const [copied, setCopied] = useState(false);
-  const textContent = Array.isArray(content) ? content.join('\n') : content;
+  
+  // Robustly handle content that might be an array or a string
+  const textContent = Array.isArray(content) ? content.join('\n- ') : (content || "N/A");
 
   return (
     <div className="mb-6">
@@ -34,12 +36,12 @@ const Section = ({ title, content, isList = false }) => {
         </button>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-700 whitespace-pre-wrap font-mono text-sm">
-        {isList && Array.isArray(content) ? (
-          <ul className="list-disc list-inside">
+        {Array.isArray(content) ? (
+          <ul className="list-disc list-inside pl-2">
             {content.map((item, index) => <li key={index}>{item}</li>)}
           </ul>
         ) : (
-          <p>{content}</p>
+          <p>{content || <span className="text-gray-400">No information provided.</span>}</p>
         )}
       </div>
     </div>
@@ -47,43 +49,44 @@ const Section = ({ title, content, isList = false }) => {
 };
 
 const AnalysisResults = ({ analysisResult, onReset }) => {
-  const [activeTab, setActiveTab] = useState('soap');
-
-  const tabs = [
-    { id: 'soap', label: 'SOAP Structure' },
-    { id: 'analysis', label: 'Clinical Analysis' },
-    { id: 'codes', label: 'ICD-10 Codes' },
-    { id: 'next_steps', label: 'Next Steps' },
-  ];
+  const { analysis, disclaimer, transcription } = analysisResult || {};
   
-  const allContent = `
-SOAP STRUCTURE
-Subjective: ${analysisResult.subjective}
-Objective: ${analysisResult.objective}
-Assessment: ${analysisResult.assessment}
-Plan: ${analysisResult.plan}
-
-CLINICAL ANALYSIS
-Key Findings: ${analysisResult.key_findings}
-Critical Points: ${analysisResult.critical_points.join('\n- ')}
-Clinical Impressions: ${analysisResult.clinical_impressions}
-
-SUGGESTED ICD-10 CODES
-${analysisResult.cdi_codes.join('\n')}
-
-RECOMMENDED NEXT STEPS
-${analysisResult.next_steps.join('\n- ')}
-
-FOLLOW-UP PRIORITIES
-${analysisResult.follow_up_priorities.join('\n- ')}
-
-RECOMMENDATIONS
-${analysisResult.recommendations.join('\n- ')}
-
-Disclaimer: ${analysisResult.disclaimer}
-  `.trim();
-
+  const [activeTab, setActiveTab] = useState(transcription ? 'transcription' : 'analysis');
   const [allCopied, setAllCopied] = useState(false);
+
+  if (!analysis) {
+    return (
+      <div className="medical-card text-center">
+        <p className="text-gray-500">No analysis results to display.</p>
+        <button
+          onClick={onReset}
+          className="mt-4 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-all"
+        >
+          &larr; Start New Note
+        </button>
+      </div>
+    );
+  }
+
+  // Dynamically generate the full text for the copy button
+  const allContent = Object.entries(analysis)
+    .map(([key, value]) => {
+      const title = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const content = Array.isArray(value) ? value.map(v => `- ${v}`).join('\n') : value;
+      return `${title.toUpperCase()}\n${content || 'N/A'}`;
+    })
+    .join('\n\n');
+
+  // Add transcription to the copy-all text if it exists
+  const fullReport = transcription 
+    ? `TRANSCRIPTION\n${transcription}\n\n${allContent}` 
+    : allContent;
+  
+  const tabs = [];
+  if (transcription) {
+    tabs.push({ id: 'transcription', label: 'Raw Transcription' });
+  }
+  tabs.push({ id: 'analysis', label: 'Structured Note' });
 
   return (
     <div className="medical-card bg-white animate-fade-in">
@@ -115,52 +118,31 @@ Disclaimer: ${analysisResult.disclaimer}
           ))}
         </nav>
       </div>
-      
-      {/* Tab Content */}
-      <div>
-        {activeTab === 'soap' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Section title="Subjective" content={analysisResult.subjective} />
-            <Section title="Objective" content={analysisResult.objective} />
-            <Section title="Assessment" content={analysisResult.assessment} />
-            <Section title="Plan" content={analysisResult.plan} />
-          </div>
-        )}
-        
-        {activeTab === 'analysis' && (
-          <div>
-            <Section title="Key Findings" content={analysisResult.key_findings} />
-            <Section title="Critical Points" content={analysisResult.critical_points} isList />
-            <Section title="Clinical Impressions" content={analysisResult.clinical_impressions} />
-          </div>
-        )}
 
-        {activeTab === 'codes' && (
-          <div>
-            <Section title="Suggested ICD-10 Codes" content={analysisResult.cdi_codes} isList />
-            <p className="text-sm text-gray-500 mt-4">These are suggestions based on the provided notes. Verify all codes against official documentation and clinical judgment.</p>
-          </div>
-        )}
+      {/* Dynamic Content */}
+      {activeTab === 'analysis' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+          {Object.entries(analysis).map(([key, value]) => {
+            const title = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            return <Section key={key} title={title} content={value} />;
+          })}
+        </div>
+      )}
 
-        {activeTab === 'next_steps' && (
-          <div>
-            <Section title="Recommended Next Steps" content={analysisResult.next_steps} isList />
-            <Section title="Follow-up Priorities" content={analysisResult.follow_up_priorities} isList />
-            <Section title="General Recommendations" content={analysisResult.recommendations} isList />
-          </div>
-        )}
-      </div>
+      {activeTab === 'transcription' && transcription && (
+        <Section title="Full Encounter Transcription" content={transcription} />
+      )}
 
       {/* Footer Actions */}
       <div className="mt-8 pt-6 border-t flex flex-col items-center">
         <button
-          onClick={() => copyToClipboard(allContent, setAllCopied)}
+          onClick={() => copyToClipboard(fullReport, setAllCopied)}
           className="bg-gray-200 text-gray-800 font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 transition-all flex items-center space-x-2"
         >
           <ClipboardIcon copied={allCopied} />
           <span>{allCopied ? 'Copied to Clipboard!' : 'Copy Entire Report'}</span>
         </button>
-        <p className="text-yellow-800 text-sm bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-6 text-center">{analysisResult.disclaimer}</p>
+        <p className="text-yellow-800 text-sm bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-6 text-center">{disclaimer}</p>
       </div>
     </div>
   );
