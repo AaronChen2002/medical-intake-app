@@ -53,6 +53,7 @@ const EncounterNotesForm = ({ onSubmit, isLoading, apiUrl }) => {
 
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setIsRecording(false);
         handleAudioUpload(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
@@ -67,7 +68,6 @@ const EncounterNotesForm = ({ onSubmit, isLoading, apiUrl }) => {
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
   };
 
@@ -130,7 +130,7 @@ const EncounterNotesForm = ({ onSubmit, isLoading, apiUrl }) => {
     <div className="medical-card" role="main" aria-labelledby="form-title">
       <div className="flex justify-between items-center mb-6">
         <h2 id="form-title" className="text-2xl font-semibold text-gray-900">
-          Create Clinical Note
+          Ambient Assistant
         </h2>
         <div className="w-full max-w-xs">
           <label htmlFor="specialty" className="block text-sm font-medium text-gray-700 sr-only">
@@ -155,8 +155,8 @@ const EncounterNotesForm = ({ onSubmit, isLoading, apiUrl }) => {
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <div className="-mb-px flex space-x-2" role="tablist">
-          <TabButton tabId="record">Record Audio</TabButton>
-          <TabButton tabId="type">Type Notes</TabButton>
+          <TabButton tabId="record">Ambient Capture</TabButton>
+          <TabButton tabId="type">Manual Entry</TabButton>
         </div>
       </div>
       
@@ -165,26 +165,26 @@ const EncounterNotesForm = ({ onSubmit, isLoading, apiUrl }) => {
         {activeTab === 'record' && (
           <div role="tabpanel" className="flex flex-col items-center justify-center">
             <p className="text-gray-600 mb-6 text-center">
-              Click the button to start recording your encounter.
+              Start the assistant at the beginning of your patient encounter.
             </p>
             <button
               type="button"
               onClick={handleRecordButtonClick}
-              disabled={isButtonDisabled}
+              disabled={isProcessing || isLoading}
               className={`flex items-center justify-center w-24 h-24 rounded-full transition-all duration-300 ease-in-out shadow-lg focus:outline-none focus:ring-4
                 ${isRecording 
                   ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300' 
                   : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-300'}
-                ${isButtonDisabled && !isRecording ? 'bg-gray-400 cursor-not-allowed' : ''}
+                ${(isProcessing || isLoading) && !isRecording ? 'bg-gray-400 cursor-not-allowed' : ''}
               `}
-              aria-label={isRecording ? "Stop Recording" : "Start Recording"}
+              aria-label={isRecording ? "End Encounter" : "Begin Encounter"}
             >
               <MicrophoneIcon className="w-10 h-10 text-white" />
             </button>
             <div className="mt-4 text-center h-6">
-              {isRecording && <p className="text-red-600 animate-pulse font-medium">Recording...</p>}
+              {isRecording && <p className="text-red-600 animate-pulse font-medium">Recording Encounter...</p>}
               {isProcessing && !isRecording && <p className="text-gray-600 animate-pulse font-medium">Processing Audio...</p>}
-              {!isRecording && !isProcessing && <p className="text-gray-500">{isButtonDisabled ? 'Waiting...' : 'Click to start'}</p>}
+              {!isRecording && !isProcessing && <p className="text-gray-500">{isButtonDisabled ? 'Waiting...' : 'Click to begin encounter'}</p>}
             </div>
           </div>
         )}

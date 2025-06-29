@@ -49,9 +49,12 @@ const Section = ({ title, content }) => {
 };
 
 const AnalysisResults = ({ analysisResult, onReset }) => {
+  const { analysis, disclaimer, transcription } = analysisResult || {};
+  
+  const [activeTab, setActiveTab] = useState(transcription ? 'transcription' : 'analysis');
   const [allCopied, setAllCopied] = useState(false);
 
-  if (!analysisResult || !analysisResult.analysis) {
+  if (!analysis) {
     return (
       <div className="medical-card text-center">
         <p className="text-gray-500">No analysis results to display.</p>
@@ -65,8 +68,6 @@ const AnalysisResults = ({ analysisResult, onReset }) => {
     );
   }
 
-  const { analysis, disclaimer } = analysisResult;
-
   // Dynamically generate the full text for the copy button
   const allContent = Object.entries(analysis)
     .map(([key, value]) => {
@@ -75,6 +76,17 @@ const AnalysisResults = ({ analysisResult, onReset }) => {
       return `${title.toUpperCase()}\n${content || 'N/A'}`;
     })
     .join('\n\n');
+
+  // Add transcription to the copy-all text if it exists
+  const fullReport = transcription 
+    ? `TRANSCRIPTION\n${transcription}\n\n${allContent}` 
+    : allContent;
+  
+  const tabs = [];
+  if (transcription) {
+    tabs.push({ id: 'transcription', label: 'Raw Transcription' });
+  }
+  tabs.push({ id: 'analysis', label: 'Structured Note' });
 
   return (
     <div className="medical-card bg-white animate-fade-in">
@@ -88,18 +100,43 @@ const AnalysisResults = ({ analysisResult, onReset }) => {
         </button>
       </div>
 
-      {/* Dynamic Content */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-        {Object.entries(analysis).map(([key, value]) => {
-          const title = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          return <Section key={key} title={title} content={value} />;
-        })}
+      {/* Tab Navigation */}
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex space-x-6">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors
+                ${activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
       </div>
+
+      {/* Dynamic Content */}
+      {activeTab === 'analysis' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+          {Object.entries(analysis).map(([key, value]) => {
+            const title = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            return <Section key={key} title={title} content={value} />;
+          })}
+        </div>
+      )}
+
+      {activeTab === 'transcription' && transcription && (
+        <Section title="Full Encounter Transcription" content={transcription} />
+      )}
 
       {/* Footer Actions */}
       <div className="mt-8 pt-6 border-t flex flex-col items-center">
         <button
-          onClick={() => copyToClipboard(allContent, setAllCopied)}
+          onClick={() => copyToClipboard(fullReport, setAllCopied)}
           className="bg-gray-200 text-gray-800 font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 transition-all flex items-center space-x-2"
         >
           <ClipboardIcon copied={allCopied} />
